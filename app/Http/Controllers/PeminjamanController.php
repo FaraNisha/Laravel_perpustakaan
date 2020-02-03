@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 use App\ModelPeminjaman;
+use App\ModelDetail_peminjaman;
 use Illuminate\Http\Request;
 use Validator;
+use Auth;
+//use DB;
 
 class PeminjamanController extends Controller
 {
@@ -12,9 +15,45 @@ class PeminjamanController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+
+    public function index($id)
     {
         //
+        if(Auth::user()->level=="petugas") {
+        $peminjaman = ModelPeminjaman::join('anggota', 'peminjaman.id_anggota',
+                      'anggota.id')->where('peminjaman.id', $id)->get();
+
+        $detail_buku="data";
+        $data=array();
+        foreach ($peminjaman as $pinjam) {
+          $ok = ModelDetail_peminjaman::where('id_peminjaman', $pinjam->id)->get();
+
+          $arr_detail = array();
+          foreach ($ok as $ok) {
+            $arr_detail[]=array(
+              'id_peminjaman' => $ok->id_peminjaman,
+              'id_buku' => $ok->id_buku,
+              'qty' => $ok->qty
+            );
+          }
+
+          $data[]=array(
+            'id' => $pinjam->id,
+            'id_anggota' => $pinjam->id_anggota,
+            'nama_anggota' => $pinjam->nama_anggota,
+            'id_petugas' => $pinjam->id_petugas,
+            'tgl_pinjam' => $pinjam->tgl_pinjam,
+            'deadline' => $pinjam->deadline,
+            'tgl_kembali' => $pinjam->tgl_kembali,
+            'denda' => $pinjam->denda,
+            'detail_buku' => $arr_detail
+          );
+        }
+        return response()->json(compact("data"));
+      }
+      else {
+        echo "Hanya petugas yang bisa mengakses halaman ini";
+      }
     }
 
     /**
@@ -36,6 +75,7 @@ class PeminjamanController extends Controller
     public function store(Request $request)
     {
         //
+        if(Auth::user()->level=="admin") {
         $validator=Validator::make($request->all(),[
           'id_anggota'=>'required',
           'id_petugas'=>'required',
@@ -48,7 +88,7 @@ class PeminjamanController extends Controller
           return response()->json($validator->errors()->toJson(),400);
         }
         else {
-          $insert=PeminjamModel::insert([
+          $insert=ModelPeminjaman::insert([
             'id_anggota'=>$request->id_anggota,
             'id_petugas'=>$request->id_petugas,
             'tgl_pinjam'=>$request->tgl_pinjam,
@@ -64,6 +104,10 @@ class PeminjamanController extends Controller
           }
           return response()->json(compact('status'));
         }
+      }
+      else {
+        echo "Mohon maaf, data hanya bisa diakses oleh admin";
+      }
     }
 
     /**
@@ -72,6 +116,38 @@ class PeminjamanController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
+
+     public function insert(Request $request)
+     {
+       if(Auth::user()->level=="petugas") {
+       $validator=Validator::make($request->all(),[
+         'id_peminjaman'=>'required',
+         'id_buku'=>'required',
+         'qty'=>'required'
+       ]);
+       if($validator->fails()){
+         return response()->json($validator->errors()->toJson(),400);
+       }
+       else {
+         $insert=ModelDetail_peminjaman::insert([
+           'id_peminjaman'=>$request->id_peminjaman,
+           'id_buku'=>$request->id_buku,
+           'qty'=>$request->qty
+         ]);
+         if($insert){
+           $status="sukses";
+         }
+         else {
+           $status="gagal";
+         }
+         return response()->json(compact('status'));
+       }
+     }
+     else {
+       echo "Hanya petugas yang bisa mengakses halaman ini";
+     }
+     }
+
     public function show($id)
     {
         //
@@ -83,9 +159,35 @@ class PeminjamanController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
         //
+        if(Auth::user()->level=="petugas") {
+        $validator=Validator::make($request->all(),
+        [
+          'id_peminjaman'=>'required',
+          'id_buku'=>'required',
+          'qty'=>'required'
+        ]
+      );
+      if($validator->fails()) {
+        return response()->json($validator->errors());
+      }
+      $ubah=ModelDetail_peminjaman::where('id', $id)->update([
+        'id_peminjaman'=>$request->id_peminjaman,
+        'id_buku'=>$request->id_buku,
+        'qty'=>$request->qty
+      ]);
+      if($ubah){
+        return response()->json(['status'=>1]);
+      }
+      else {
+        return response()->json(['status'=>0]);
+      }
+    }
+    else {
+      echo "Hanya petugas yang bisa mengakses halaman ini";
+    }
     }
 
     /**
@@ -98,6 +200,7 @@ class PeminjamanController extends Controller
     public function update(Request $request, $id)
     {
         //
+        if(Auth::user()->level=="admin") {
         $validator=Validator::make($request->all(),
         [
           'id_anggota'=>'required',
@@ -106,7 +209,6 @@ class PeminjamanController extends Controller
           'deadline'=>'required',
           'tgl_kembali'=>'required',
           'denda'=>'required'
-
         ]
       );
       if($validator->fails()) {
@@ -127,6 +229,10 @@ class PeminjamanController extends Controller
         return response()->json(['status'=>0]);
       }
     }
+    else {
+      echo "Mohon maaf, data hanya bisa diakses oleh admin";
+    }
+    }
 
     /**
      * Remove the specified resource from storage.
@@ -137,6 +243,7 @@ class PeminjamanController extends Controller
     public function destroy($id)
     {
         //
+        if(Auth::user()->level=="admin") {
         $hapus=ModelPeminjaman::where('id',$id)->delete();
         if($hapus){
           return response()->json(['status'=>1]);
@@ -144,5 +251,26 @@ class PeminjamanController extends Controller
         else {
           return response()->json(['status'=>0]);
         }
+      }
+      else {
+        echo "Mohon maaf, data hanya bisa diakses oleh admin";
+      }
+    }
+
+    public function delete($id)
+    {
+        //
+        if(Auth::user()->level=="petugas") {
+        $hapus=ModelDetail_peminjaman::where('id',$id)->delete();
+        if($hapus){
+          return response()->json(['status'=>1]);
+        }
+        else {
+          return response()->json(['status'=>0]);
+        }
+      }
+      else {
+        echo "Hanya petugas yang bisa mengakses halaman ini";
+      }
     }
 }

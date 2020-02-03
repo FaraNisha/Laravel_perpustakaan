@@ -17,7 +17,7 @@ class AnggotaController extends Controller
     public function index()
     {
         //
-        if(Auth::user()->level="admin") {
+        if(Auth::user()->level=="admin") {
         $data=ModelAnggota::all();
         return response()->json($data);
       }
